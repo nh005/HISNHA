@@ -1170,7 +1170,7 @@ def render_help():
                 report_text = (
                     "مسودة بلاغ عن حادثة رقمية – حِصنها\n"
                     "----------------------------------\n"
-                    f"نوع الحادثة: {item['title_ar']}\n"
+                    f"نوع الحادثة: {item['label_ar']}\n"
                     f"المنصة أو الخدمة: {platform.strip()}\n"
                     f"وقت/تاريخ الحادثة: {time_text}\n"
                     f"الحساب/اسم المستخدم/الرابط: {reference_text}\n\n"
@@ -1185,7 +1185,7 @@ def render_help():
                 report_text = (
                     "Digital Incident Report Draft – HISNHA\n"
                     "--------------------------------------\n"
-                    f"Incident type: {item['title_en']}\n"
+                    f"Incident type: {item['label_en']}\n"
                     f"Platform or service: {platform.strip()}\n"
                     f"Date/time: {time_text}\n"
                     f"Account/username/link: {reference_text}\n\n"
