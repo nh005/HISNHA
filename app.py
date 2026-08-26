@@ -5,6 +5,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 from typing import Literal
+from urllib.parse import quote
 
 
 st.set_page_config(
@@ -893,6 +894,16 @@ def render_help():
         )
     )
 
+    soft_card(
+        tr(
+            "🧭 Your response path: Respond Now → Prepare My Report → Get Official Help",
+            "🧭 مسار المساعدة: تصرّفي الآن ← جهّزي بلاغك ← احصلي على مساعدة رسمية",
+        ),
+        "neutral",
+        margin_top=8,
+        margin_bottom=18,
+    )
+
     situation_keys = list(HELP_CONTENT.keys())
     selected_key = st.selectbox(
         tr("What happened?", "ما الذي حدث؟"),
@@ -905,12 +916,22 @@ def render_help():
     st.markdown(f"## {tr(item['title_en'], item['title_ar'])}")
     st.write(tr(item["intro_en"], item["intro_ar"]))
 
-    st.markdown(tr("### ✅ Recommended Steps", "### ✅ الخطوات المقترحة"))
+    # ---------------------------------------------------------
+    # 1. RESPOND NOW
+    # ---------------------------------------------------------
+    st.markdown(tr("### 🛡️ 1. Respond Now", "### 🛡️ 1. تصرّفي الآن"))
+    st.caption(
+        tr(
+            "Start with these immediate steps before moving to reporting.",
+            "ابدئي بهذه الخطوات الفورية قبل الانتقال إلى إعداد البلاغ.",
+        )
+    )
+
     steps = item["steps_ar"] if LANG == "AR" else item["steps_en"]
     for number, step in enumerate(steps, start=1):
         st.write(f"{number}. {step}")
 
-    # Warm, situation-specific follow-up cards for EVERY help topic.
+    # Warm, situation-specific What-if cards for every help topic.
     if selected_key == "hacked":
         st.markdown(f"### ❓ {tr(item['extra_title_en'], item['extra_title_ar'])}")
         soft_card(
@@ -1008,6 +1029,323 @@ def render_help():
             "warning",
             margin_top=5,
             margin_bottom=18,
+        )
+
+    st.divider()
+
+    # ---------------------------------------------------------
+    # 2. PREPARE MY REPORT
+    # ---------------------------------------------------------
+    st.markdown(tr("### 📝 2. Prepare My Report", "### 📝 2. جهّزي بلاغك"))
+
+    soft_card(
+        tr(
+            "HISNHA can organize the basic facts into a clear report draft. This step does not call Gemini and does not submit anything automatically.",
+            "تستطيع حِصنها ترتيب المعلومات الأساسية في مسودة بلاغ واضحة. هذه الخطوة لا تستخدم Gemini ولا ترسل أي شيء تلقائيًا.",
+        ),
+        "info",
+        margin_top=6,
+        margin_bottom=10,
+    )
+
+    st.caption(
+        tr(
+            "⚠️ Do not enter passwords, OTP codes, banking credentials, private images, or other highly sensitive information.",
+            "⚠️ لا تُدخلي كلمات المرور أو رموز OTP أو بيانات الدخول البنكية أو الصور الخاصة أو أي معلومات شديدة الحساسية.",
+        )
+    )
+
+    if LANG == "AR":
+        evidence_options = [
+            "لقطات شاشة",
+            "رسائل أو محادثات",
+            "اسم مستخدم أو رابط حساب",
+            "رابط أو موقع إلكتروني",
+            "تفاصيل تحويل أو دفع",
+            "تنبيهات أمان أو تسجيل دخول",
+            "أدلة أخرى",
+        ]
+        impact_options = [
+            "ضغطت على رابط",
+            "شاركت معلومات حساب",
+            "شاركت كلمة مرور أو رمز تحقق",
+            "أرسلت مالًا أو معلومات دفع",
+            "فقدت الوصول إلى حساب",
+            "تم نشر أو التهديد بنشر معلومات/محتوى خاص",
+            "تلقيت تهديدًا مباشرًا",
+            "لا شيء مما سبق / غير متأكدة",
+        ]
+        danger_options = ["لا", "غير متأكدة", "نعم"]
+    else:
+        evidence_options = [
+            "Screenshots",
+            "Messages or chat history",
+            "Username or profile link",
+            "Website or URL",
+            "Payment or transfer details",
+            "Security/login alerts",
+            "Other evidence",
+        ]
+        impact_options = [
+            "I clicked a link",
+            "I shared account information",
+            "I shared a password or verification code",
+            "I sent money or payment information",
+            "I lost access to an account",
+            "Private information/content was shared or threatened",
+            "I received a direct threat",
+            "None of these / I am not sure",
+        ]
+        danger_options = ["No", "Not sure", "Yes"]
+
+    with st.form(key=f"report_form_{selected_key}"):
+        platform = st.text_input(
+            tr("Platform or service *", "المنصة أو الخدمة *"),
+            placeholder=tr("e.g., Instagram, WhatsApp, Email", "مثال: Instagram أو WhatsApp أو البريد الإلكتروني"),
+        )
+
+        incident_time = st.text_input(
+            tr("When did it happen? (optional)", "متى حدث ذلك؟ (اختياري)"),
+            placeholder=tr("e.g., 26 Aug 2026, around 3 PM", "مثال: 26 أغسطس 2026، حوالي الساعة 3 مساءً"),
+        )
+
+        account_reference = st.text_input(
+            tr("Account, username, or link involved (optional)", "الحساب أو اسم المستخدم أو الرابط المرتبط بالحادثة (اختياري)"),
+            placeholder=tr("@username or profile/link", "@username أو رابط الحساب"),
+        )
+
+        short_summary = st.text_area(
+            tr("Brief factual description *", "وصف مختصر وواقعي لما حدث *"),
+            height=120,
+            placeholder=tr(
+                "Describe what happened in a few sentences without adding passwords, codes, or private images.",
+                "صفي ما حدث بعدة جمل بدون إضافة كلمات مرور أو رموز تحقق أو صور خاصة.",
+            ),
+        )
+
+        evidence = st.multiselect(
+            tr("Evidence you have", "الأدلة المتوفرة لديك"),
+            evidence_options,
+        )
+
+        impact = st.multiselect(
+            tr("What has already happened?", "ما الذي حدث بالفعل؟"),
+            impact_options,
+        )
+
+        immediate_danger = st.radio(
+            tr(
+                "Is there an immediate concern for your physical safety?",
+                "هل يوجد خطر مباشر على سلامتك الجسدية؟",
+            ),
+            danger_options,
+            horizontal=True,
+            index=0,
+        )
+
+        prepare_clicked = st.form_submit_button(
+            tr("📝 Prepare Report Draft", "📝 تجهيز مسودة البلاغ"),
+            type="primary",
+            use_container_width=True,
+        )
+
+    report_key = f"prepared_report_{selected_key}"
+    editable_report_key = f"editable_report_{selected_key}"
+
+    if prepare_clicked:
+        if not platform.strip() or not short_summary.strip():
+            st.warning(
+                tr(
+                    "Please complete the platform/service and brief description first.",
+                    "يرجى تعبئة المنصة أو الخدمة والوصف المختصر أولًا.",
+                )
+            )
+        else:
+            evidence_text = ", ".join(evidence) if evidence else tr("Not specified", "غير محدد")
+            impact_text = ", ".join(impact) if impact else tr("Not specified", "غير محدد")
+            time_text = incident_time.strip() if incident_time.strip() else tr("Not specified", "غير محدد")
+            reference_text = account_reference.strip() if account_reference.strip() else tr("Not specified", "غير محدد")
+
+            if LANG == "AR":
+                report_text = (
+                    "مسودة بلاغ عن حادثة رقمية – حِصنها\n"
+                    "----------------------------------\n"
+                    f"نوع الحادثة: {item['title_ar']}\n"
+                    f"المنصة أو الخدمة: {platform.strip()}\n"
+                    f"وقت/تاريخ الحادثة: {time_text}\n"
+                    f"الحساب/اسم المستخدم/الرابط: {reference_text}\n\n"
+                    f"وصف مختصر:\n{short_summary.strip()}\n\n"
+                    f"الأدلة المتوفرة: {evidence_text}\n"
+                    f"ما الذي حدث بالفعل: {impact_text}\n"
+                    f"خطر مباشر على السلامة الجسدية: {immediate_danger}\n\n"
+                    "ملاحظة: تمت صياغة هذه المسودة بواسطة حِصنها لمساعدة المستخدمة على تنظيم المعلومات. "
+                    "راجعيها قبل إرسالها إلى أي جهة رسمية."
+                )
+            else:
+                report_text = (
+                    "Digital Incident Report Draft – HISNHA\n"
+                    "--------------------------------------\n"
+                    f"Incident type: {item['title_en']}\n"
+                    f"Platform or service: {platform.strip()}\n"
+                    f"Date/time: {time_text}\n"
+                    f"Account/username/link: {reference_text}\n\n"
+                    f"Brief description:\n{short_summary.strip()}\n\n"
+                    f"Evidence available: {evidence_text}\n"
+                    f"What has already happened: {impact_text}\n"
+                    f"Immediate physical-safety concern: {immediate_danger}\n\n"
+                    "Note: This draft was formatted by HISNHA to help the user organize the basic facts. "
+                    "Review it before sending it to any official authority."
+                )
+
+            st.session_state[report_key] = report_text
+            st.session_state[editable_report_key] = report_text
+
+    prepared_report = st.session_state.get(report_key)
+
+    if prepared_report:
+        st.success(
+            tr(
+                "Your report draft is ready. Review or edit it before contacting an official authority.",
+                "مسودة البلاغ جاهزة. راجعيها أو عدّليها قبل التواصل مع أي جهة رسمية.",
+            )
+        )
+
+        edited_report = st.text_area(
+            tr("Report preview — you can edit it", "معاينة البلاغ — يمكنك تعديله"),
+            key=editable_report_key,
+            height=300,
+        )
+
+        st.download_button(
+            tr("⬇️ Save Report as TXT", "⬇️ حفظ البلاغ كملف TXT"),
+            data=edited_report,
+            file_name="HISNHA_incident_report.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
+    else:
+        edited_report = ""
+
+    st.divider()
+
+    # ---------------------------------------------------------
+    # 3. GET OFFICIAL HELP — JORDAN
+    # ---------------------------------------------------------
+    st.markdown(tr("### 🏛️ 3. Get Official Help", "### 🏛️ 3. احصلي على مساعدة رسمية"))
+
+    soft_card(
+        tr(
+            "Official support in this prototype is currently configured for Jordan. HISNHA opens the official contact channel; it does not submit a report on your behalf.",
+            "الدعم الرسمي في هذا النموذج الأولي مهيأ حاليًا للأردن. تفتح حِصنها قناة التواصل الرسمية، لكنها لا ترسل البلاغ نيابةً عنك.",
+        ),
+        "neutral",
+        margin_top=6,
+        margin_bottom=14,
+    )
+
+    st.markdown(
+        tr(
+            "**Jordan Public Security Directorate — Cybercrime Unit**",
+            "**مديرية الأمن العام الأردنية — وحدة مكافحة الجرائم الإلكترونية**",
+        )
+    )
+
+    st.write(
+        tr(
+            "Phone: **196** — extensions **812594 / 812232**",
+            "الهاتف: **196** — الفرعي **812594 / 812232**",
+        )
+    )
+    st.write("Email: **ecrimes@psd.gov.jo**")
+
+    cybercrime_page = (
+        "https://www.psd.gov.jo/ar-jo/"
+        "%D8%A7%D9%84%D8%A5%D8%AF%D8%A7%D8%B1%D8%A7%D8%AA-%D9%88%D8%A7%D9%84%D9%88%D8%AD%D8%AF%D8%A7%D8%AA/"
+        "%D8%A5%D8%AF%D8%A7%D8%B1%D8%A9-%D8%A7%D9%84%D8%A8%D8%AD%D8%AB-%D8%A7%D9%84%D8%AC%D9%86%D8%A7%D8%A6%D9%8A/"
+        "%D9%88%D8%AD%D8%AF%D8%A9-%D9%85%D9%83%D8%A7%D9%81%D8%AD%D8%A9-%D8%A7%D9%84%D8%AC%D8%B1%D8%A7%D8%A6%D9%85-"
+        "%D8%A7%D9%84%D8%A5%D9%84%D9%83%D8%AA%D8%B1%D9%88%D9%86%D9%8A%D8%A9/"
+    )
+
+    email_subject = tr(
+        "Cybercrime Incident Report",
+        "بلاغ عن حادثة إلكترونية",
+    )
+
+    email_body = edited_report.strip() if edited_report.strip() else tr(
+        "I would like to report a cybercrime incident. I will provide the relevant facts and evidence through the appropriate official process.",
+        "أرغب في الإبلاغ عن حادثة إلكترونية، وسأقدّم المعلومات والأدلة ذات الصلة من خلال الإجراء الرسمي المناسب.",
+    )
+
+    mailto_url = (
+        "mailto:ecrimes@psd.gov.jo"
+        f"?subject={quote(email_subject)}"
+        f"&body={quote(email_body)}"
+    )
+
+    # Email and official-page access are safe to expose directly.
+    contact_col1, contact_col2 = st.columns(2)
+
+    with contact_col1:
+        st.link_button(
+            tr("✉️ Email Cybercrime Unit", "✉️ مراسلة وحدة الجرائم الإلكترونية"),
+            mailto_url,
+            use_container_width=True,
+        )
+
+    with contact_col2:
+        st.link_button(
+            tr("🌐 Open Official Page", "🌐 فتح الصفحة الرسمية"),
+            cybercrime_page,
+            use_container_width=True,
+        )
+
+    st.caption(
+        tr(
+            "The email button only opens your email app with a draft. Nothing is sent until you review it and press Send.",
+            "زر البريد يفتح تطبيق البريد مع مسودة جاهزة فقط. لن يتم إرسال أي شيء قبل أن تراجعيه وتضغطي إرسال.",
+        )
+    )
+
+    # Final-production safety: phone actions are shown only after an explicit user confirmation.
+    allow_call_links = st.checkbox(
+        tr(
+            "I want to open official phone-contact options.",
+            "أرغب في إظهار خيارات الاتصال الهاتفي الرسمية.",
+        ),
+        key=f"allow_official_calls_{selected_key}",
+    )
+
+    if allow_call_links:
+        soft_card(
+            tr(
+                "📞 These buttons open your phone's calling screen with the official number. HISNHA does not place the call automatically.",
+                "📞 هذه الأزرار تفتح شاشة الاتصال في هاتفك على الرقم الرسمي. حِصنها لا تجري المكالمة تلقائيًا.",
+            ),
+            "info",
+            margin_top=6,
+            margin_bottom=10,
+        )
+
+        st.link_button(
+            tr("📞 Open Call Screen — Cybercrime Unit (196)", "📞 فتح شاشة الاتصال — وحدة الجرائم الإلكترونية (196)"),
+            "tel:196",
+            use_container_width=True,
+        )
+
+    # Keep HISNHA focused on digital-safety support.
+    # If the user reports immediate physical danger, provide general emergency guidance
+    # without embedding or dialing an emergency number inside the app.
+    danger_is_yes = immediate_danger in ("Yes", "نعم")
+
+    if danger_is_yes:
+        soft_card(
+            tr(
+                "🚨 If you are in immediate physical danger, prioritize your personal safety and contact the appropriate local emergency services or a trusted person who can help you reach safety.",
+                "🚨 إذا كنتِ في خطر جسدي مباشر، فاجعلي سلامتك الشخصية أولوية وتواصلي مع خدمات الطوارئ المحلية المناسبة أو مع شخص موثوق يمكنه مساعدتك للوصول إلى مكان آمن.",
+            ),
+            "danger",
+            margin_top=14,
+            margin_bottom=8,
         )
 
     st.divider()
